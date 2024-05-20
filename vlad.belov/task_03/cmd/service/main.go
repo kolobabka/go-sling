@@ -5,12 +5,14 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
+	"golang.org/x/text/encoding/charmap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -75,12 +77,24 @@ func main() {
 	}
 
 	xmlFile, errorCode := os.Open(config.Input)
+
 	if errorCode != nil {
 		fmt.Printf("Unable to open a file: %s\n", config.Input)
 		panic(errorCode)
 	}
 
+	defer xmlFile.Close()
+
 	xmlDecoder := xml.NewDecoder(xmlFile)
+
+	xmlDecoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		switch charset {
+		case "windows-1251":
+			return charmap.Windows1251.NewDecoder().Reader(input), nil
+		default:
+			return nil, fmt.Errorf("unknown charset: %s", charset)
+		}
+	}
 
 	var vals ValCurs
 	errorCode = xmlDecoder.Decode(&vals)
@@ -107,6 +121,7 @@ func main() {
 	}
 
 	file, errorCode := os.Create(config.Output)
+
 	if errorCode != nil && !os.IsExist(errorCode) {
 		fmt.Printf("Unable to create a file %s\n", config.Output)
 		panic(errorCode)
@@ -119,5 +134,4 @@ func main() {
 	}
 
 	file.Close()
-	xmlFile.Close()
 }
